@@ -9,27 +9,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   
-  const isHomePage = location.pathname === '/';
-
-  // Dynamic classes based on page location to highlight buttons on Home
+  // Dynamic classes to highlight buttons on ALL pages
   const getNavLinkClass = (path: string) => {
     const active = location.pathname === path;
     
-    if (isHomePage) {
-      // Highlighted Button Style for Home Page
-      const baseStyle = "px-5 py-2 rounded-sm font-bold uppercase tracking-widest text-xs transition-all duration-300 border shadow-lg transform hover:-translate-y-0.5";
-      if (active) {
-        return `${baseStyle} bg-gold-500 text-navy-900 border-gold-500`;
-      }
-      return `${baseStyle} bg-navy-800/80 text-white border-slate-600 hover:bg-gold-500 hover:text-navy-900 hover:border-gold-500 backdrop-blur-sm`;
-    }
-
-    // Standard Text Link Style for other pages
-    const baseStyle = "text-sm uppercase tracking-widest font-semibold transition-colors relative py-2";
+    // Highlighted Button Style (Applied Globally)
+    const baseStyle = "px-5 py-2 rounded-sm font-bold uppercase tracking-widest text-xs transition-all duration-300 border shadow-lg transform hover:-translate-y-0.5";
+    
     if (active) {
-       return `${baseStyle} text-gold-500 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-0.5 after:bg-gold-500`;
+      // Active: Gold background, Navy text
+      return `${baseStyle} bg-gold-500 text-navy-900 border-gold-500`;
     }
-    return `${baseStyle} text-slate-300 hover:text-white`;
+    
+    // Inactive: Darker Navy button, distinct from header, turns Gold on hover
+    return `${baseStyle} bg-navy-800 text-slate-300 border-slate-700 hover:bg-gold-500 hover:text-navy-900 hover:border-gold-500`;
   };
 
   // Force Home on Mount
@@ -90,7 +83,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {/* Header */}
         <header className="bg-navy-900 text-white sticky top-0 z-50 shadow-lg border-b border-slate-800 transition-all duration-300">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className={`flex justify-between items-center transition-all duration-300 ${isHomePage ? 'h-24' : 'h-20'}`}>
+            <div className="flex justify-between items-center h-24 transition-all duration-300">
               <Link to="/" className="flex items-center space-x-3 group">
                 <div className="p-2 bg-gold-500 rounded-sm group-hover:bg-gold-400 transition-colors">
                   <Building2 className="h-6 w-6 text-navy-900" />
@@ -102,7 +95,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </Link>
               
               {/* Desktop Nav */}
-              <nav className={`hidden md:flex items-center ${isHomePage ? 'gap-4' : 'space-x-8'}`}>
+              <nav className="hidden md:flex items-center gap-4">
                 <Link to="/" className={getNavLinkClass('/')}>Início</Link>
                 <Link to="/vender" className={getNavLinkClass('/vender')}>Vender</Link>
                 <Link to="/comprar" className={getNavLinkClass('/comprar')}>Comprar</Link>
