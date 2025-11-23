@@ -1,14 +1,43 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Building2, Menu, X, ShieldCheck, Bell } from 'lucide-react';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [hasNewLeads, setHasNewLeads] = React.useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  
+  const isHomePage = location.pathname === '/';
 
-  const isActive = (path: string) => location.pathname === path ? 'text-gold-500' : 'text-slate-300 hover:text-white';
+  // Dynamic classes based on page location to highlight buttons on Home
+  const getNavLinkClass = (path: string) => {
+    const active = location.pathname === path;
+    
+    if (isHomePage) {
+      // Highlighted Button Style for Home Page
+      const baseStyle = "px-5 py-2 rounded-sm font-bold uppercase tracking-widest text-xs transition-all duration-300 border shadow-lg transform hover:-translate-y-0.5";
+      if (active) {
+        return `${baseStyle} bg-gold-500 text-navy-900 border-gold-500`;
+      }
+      return `${baseStyle} bg-navy-800/80 text-white border-slate-600 hover:bg-gold-500 hover:text-navy-900 hover:border-gold-500 backdrop-blur-sm`;
+    }
+
+    // Standard Text Link Style for other pages
+    const baseStyle = "text-sm uppercase tracking-widest font-semibold transition-colors relative py-2";
+    if (active) {
+       return `${baseStyle} text-gold-500 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-0.5 after:bg-gold-500`;
+    }
+    return `${baseStyle} text-slate-300 hover:text-white`;
+  };
+
+  // Force Home on Mount
+  useEffect(() => {
+    // This ensures that whenever the app is fully reloaded (or opened for the first time),
+    // it always starts at the Home page, ignoring deep links or previous hash states.
+    navigate('/');
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   useEffect(() => {
     // Check initial state
@@ -59,9 +88,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Content Wrapper (sits on top of background) */}
       <div className="relative z-10 flex flex-col min-h-screen">
         {/* Header */}
-        <header className="bg-navy-900 text-white sticky top-0 z-50 shadow-lg border-b border-slate-800">
+        <header className="bg-navy-900 text-white sticky top-0 z-50 shadow-lg border-b border-slate-800 transition-all duration-300">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-20">
+            <div className={`flex justify-between items-center transition-all duration-300 ${isHomePage ? 'h-24' : 'h-20'}`}>
               <Link to="/" className="flex items-center space-x-3 group">
                 <div className="p-2 bg-gold-500 rounded-sm group-hover:bg-gold-400 transition-colors">
                   <Building2 className="h-6 w-6 text-navy-900" />
@@ -73,15 +102,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </Link>
               
               {/* Desktop Nav */}
-              <nav className="hidden md:flex space-x-8 items-center">
-                <Link to="/" className={`text-sm uppercase tracking-widest font-semibold transition-colors ${isActive('/')}`}>Início</Link>
-                <Link to="/vender" className={`text-sm uppercase tracking-widest font-semibold transition-colors ${isActive('/vender')}`}>Vender</Link>
-                <Link to="/comprar" className={`text-sm uppercase tracking-widest font-semibold transition-colors ${isActive('/comprar')}`}>Comprar</Link>
+              <nav className={`hidden md:flex items-center ${isHomePage ? 'gap-4' : 'space-x-8'}`}>
+                <Link to="/" className={getNavLinkClass('/')}>Início</Link>
+                <Link to="/vender" className={getNavLinkClass('/vender')}>Vender</Link>
+                <Link to="/comprar" className={getNavLinkClass('/comprar')}>Comprar</Link>
                 
-                <Link to="/gestao" className={`relative text-sm uppercase tracking-widest font-semibold transition-colors ${isActive('/gestao')}`}>
+                <Link to="/gestao" className={`relative ${getNavLinkClass('/gestao')}`}>
                   Gestão
                   {hasNewLeads && (
-                    <span className="absolute -top-2 -right-3 flex h-3 w-3">
+                    <span className="absolute -top-2 -right-2 flex h-3 w-3">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                     </span>
