@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Building2, Menu, X, ShieldCheck, Bell } from 'lucide-react';
@@ -81,9 +80,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Content Wrapper (sits on top of background) */}
       <div className="relative z-10 flex flex-col min-h-screen">
         {/* Header */}
-        <header className="bg-navy-900 text-white sticky top-0 z-50 shadow-lg border-b border-slate-800 transition-all duration-300">
+        <header className="bg-navy-900 text-white sticky top-0 z-50 shadow-lg border-b border-slate-800">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-24 transition-all duration-300">
+            <div className="flex justify-between items-center h-24">
               <Link to="/" className="flex items-center space-x-3 group">
                 <div className="p-2 bg-gold-500 rounded-sm group-hover:bg-gold-400 transition-colors">
                   <Building2 className="h-6 w-6 text-navy-900" />
