@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Key, Search, Building, MapPin, BedDouble, Ruler } from 'lucide-react';
+import { Key, Search, Building, MapPin, BedDouble, Ruler, Youtube } from 'lucide-react';
 import { getProperties } from '../services/storageService';
 import { Property } from '../types';
 
@@ -19,7 +19,7 @@ const Home: React.FC = () => {
   return (
     <div className="min-h-full bg-transparent">
       {/* Hero Section */}
-      <div className="relative w-full min-h-[calc(100vh-80px)] flex items-center justify-center overflow-hidden">
+      <div className="relative w-full min-h-[calc(100vh-96px)] flex items-start justify-center overflow-hidden pt-4 md:pt-8">
         
         {/* Background Image: Barra da Tijuca (Grayscale) */}
         <div 
@@ -36,16 +36,16 @@ const Home: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto py-20">
-          <h1 className="text-4xl md:text-6xl font-serif font-bold text-white mb-6 leading-tight drop-shadow-lg">
+        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto pb-10">
+          <h1 className="text-2xl md:text-3xl font-serif font-bold text-white mb-6 leading-tight drop-shadow-lg">
             Ponto de encontro para <br/>
             <span className="text-gold-500 italic">negócios imobiliários</span> na Barra da Tijuca.
           </h1>
-          <p className="text-lg md:text-xl text-slate-100 mb-12 max-w-2xl mx-auto font-light tracking-wide drop-shadow-md">
+          <p className="text-sm md:text-base text-slate-100 mb-8 max-w-2xl mx-auto font-light tracking-wide drop-shadow-md">
             Conectamos proprietários e compradores com exclusividade, discrição e a sofisticação que você merece.
           </p>
 
-          <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-16">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-12">
             <Link 
               to="/vender" 
               className="group w-full md:w-auto px-8 py-4 bg-gold-500 hover:bg-gold-400 text-navy-900 font-bold rounded-sm shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1 flex items-center justify-center space-x-3"
@@ -75,7 +75,7 @@ const Home: React.FC = () => {
           {/* Featured Section */}
           {featuredProperties.length > 0 && (
             <div className="animate-in slide-in-from-bottom-8 duration-700">
-               <div className="flex items-center justify-center gap-4 mb-8">
+               <div className="flex items-center justify-center gap-4 mb-6">
                   <div className="h-[1px] w-12 bg-gold-500 shadow-sm"></div>
                   <h2 className="text-2xl md:text-3xl font-serif font-bold text-white tracking-wide drop-shadow-md">Destaques Exclusivos</h2>
                   <div className="h-[1px] w-12 bg-gold-500 shadow-sm"></div>
@@ -90,9 +90,34 @@ const Home: React.FC = () => {
                      >
                         <div className="h-48 relative overflow-hidden">
                            <img src={prop.images[0]} alt={prop.condoName} className="w-full h-full object-cover" />
+                           
+                           {/* Highlight Label */}
                            <div className="absolute top-3 right-3 bg-navy-900 text-gold-500 px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm">
                               Destaque
                            </div>
+
+                           {/* Video Icon Link */}
+                           {prop.videoUrl && (
+                             <a 
+                               href={prop.videoUrl} 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               className="absolute top-3 left-3 bg-red-600/90 text-white p-2 rounded-full hover:bg-red-600 hover:scale-110 transition-all shadow-md flex items-center justify-center z-20"
+                               title="Ver vídeo do imóvel"
+                               onClick={(e) => e.stopPropagation()}
+                             >
+                               <Youtube className="h-4 w-4 fill-current" />
+                             </a>
+                           )}
+
+                           {/* Price Display on Featured Card */}
+                           {prop.price && prop.price > 0 && (
+                              <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/70 to-transparent p-4 pt-10">
+                                 <p className="text-white font-bold text-lg">
+                                   {prop.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                 </p>
+                              </div>
+                           )}
                         </div>
                         <div className="p-4">
                            <h3 className="font-serif font-bold text-navy-900 truncate">{prop.condoName || 'Oportunidade Exclusiva'}</h3>

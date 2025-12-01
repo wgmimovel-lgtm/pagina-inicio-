@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProperties, getInterests, getMatches, getUsers, addUser, removeUser, removeProperty, updateMatchStatus, togglePropertyFeatured } from '../services/storageService';
+import { getProperties, getInterests, getMatches, getUsers, addUser, removeUser, removeProperty, updateMatchStatus, togglePropertyFeatured, updatePropertyStatus } from '../services/storageService';
 import { logout, getCurrentUser } from '../services/authService';
 import { Property, BuyerInterest, LeadMatch, User } from '../types';
-import { Users, Home, Link as LinkIcon, LogOut, Shield, Plus, Trash2, Eye, CheckCircle, Star } from 'lucide-react';
+import { Users, Home, Link as LinkIcon, LogOut, Shield, Plus, Trash2, Eye, CheckCircle, Star, Clock, ThumbsUp } from 'lucide-react';
 
 const Backoffice: React.FC = () => {
   const navigate = useNavigate();
@@ -23,17 +23,19 @@ const Backoffice: React.FC = () => {
   const [teamError, setTeamError] = useState('');
   const [teamSuccess, setTeamSuccess] = useState('');
 
+  // Function to load data centrally
+  const loadData = () => {
+    setData({
+      properties: getProperties().sort((a, b) => b.createdAt - a.createdAt), // Newest first
+      interests: getInterests(),
+      matches: getMatches().sort((a, b) => b.createdAt - a.createdAt),
+      users: getUsers(),
+    });
+  };
+
   useEffect(() => {
-    const loadData = () => {
-      setData({
-        properties: getProperties(),
-        interests: getInterests(),
-        matches: getMatches().sort((a, b) => b.createdAt - a.createdAt),
-        users: getUsers(),
-      });
-    };
     loadData();
-    const interval = setInterval(loadData, 5000); // Refresh
+    const interval = setInterval(loadData, 5000); // Refresh every 5s
     return () => clearInterval(interval);
   }, []);
 
@@ -78,18 +80,53 @@ const Backoffice: React.FC = () => {
   const handleRemoveProperty = (propertyId: string) => {
     if (window.confirm("Tem certeza que deseja excluir este imóvel permanentemente?")) {
       removeProperty(propertyId);
-      setData(prev => ({ ...prev, properties: getProperties() }));
+      // Remove from local state immediately
+      setData(prev => ({
+        ...prev,
+        properties: prev.properties.filter(p => p.id !== propertyId)
+      }));
     }
   };
 
-  const handleToggleFeatured = (propertyId: string) => {
-    togglePropertyFeatured(propertyId);
-    setData(prev => ({ ...prev, properties: getProperties() }));
+  const handleToggleFeatured = (e: React.MouseEvent, property: Property) => {
+    // CRITICAL: Stop propagation to prevent row clicks
+    e.stopPropagation();
+
+    // Logic: Must be approved to be featured
+    if (property.status !== 'APPROVED') {
+      alert("Atenção: O imóvel precisa ser APROVADO antes de ir para os destaques.");
+      return;
+    }
+
+    // 1. Update Storage
+    togglePropertyFeatured(property.id);
+    
+    // 2. Immediate UI Update
+    const updatedProps = data.properties.map(p => 
+      p.id === property.id ? { ...p, isFeatured: !p.isFeatured } : p
+    );
+    setData(prev => ({ ...prev, properties: updatedProps }));
+  };
+
+  const handleApproveProperty = (e: React.MouseEvent, propertyId: string) => {
+    // CRITICAL: Stop propagation to prevent row clicks
+    e.stopPropagation();
+    
+    // DIRECT ACTION: No confirmation dialog to avoid browser blocking
+    
+    // 1. Update Storage
+    updatePropertyStatus(propertyId, 'APPROVED');
+    
+    // 2. Immediate UI Update
+    const updatedProps = data.properties.map(p => 
+      p.id === propertyId ? { ...p, status: 'APPROVED' } : p
+    );
+    // @ts-ignore - Explicitly casting for state update
+    setData(prev => ({ ...prev, properties: updatedProps }));
   };
 
   const handleUpdateStatus = (matchId: string, newStatus: 'CONTACTED' | 'CLOSED') => {
     updateMatchStatus(matchId, newStatus);
-    // Instant update in local state for better UX
     setData(prev => ({
       ...prev,
       matches: prev.matches.map(m => m.id === matchId ? { ...m, status: newStatus } : m)
@@ -114,6 +151,25 @@ const Backoffice: React.FC = () => {
     }
   };
 
+  const getPropStatusBadge = (status: string) => {
+    switch (status) {
+      case 'PENDING': 
+        return (
+          <span className="flex items-center gap-1 text-xs font-bold bg-amber-100 text-amber-800 px-2 py-1 rounded-full border border-amber-200">
+            <Clock className="h-3 w-3" /> Pendente
+          </span>
+        );
+      case 'APPROVED': 
+        return (
+          <span className="flex items-center gap-1 text-xs font-bold bg-green-100 text-green-800 px-2 py-1 rounded-full border border-green-200">
+            <CheckCircle className="h-3 w-3" /> Publicado
+          </span>
+        );
+      default: 
+        return <span className="text-xs">{status}</span>;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -129,6 +185,7 @@ const Backoffice: React.FC = () => {
           </div>
           
           <button 
+            type="button"
             onClick={handleLogout}
             className="flex items-center gap-2 text-slate-500 hover:text-red-600 text-sm font-semibold transition-colors px-4 py-2 rounded-sm hover:bg-slate-200"
           >
@@ -139,18 +196,21 @@ const Backoffice: React.FC = () => {
 
         <div className="flex flex-wrap space-x-2 md:space-x-4 mb-6 border-b border-slate-200 pb-1 overflow-x-auto">
           <button 
+            type="button"
             onClick={() => setActiveTab('MATCHES')}
             className={`pb-2 px-4 text-sm font-semibold flex items-center gap-2 transition-colors whitespace-nowrap ${activeTab === 'MATCHES' ? 'border-b-2 border-gold-500 text-navy-900' : 'text-slate-500'}`}
           >
-            <LinkIcon className="h-4 w-4" /> Intermediações
+            <LinkIcon className="h-4 w-4" /> Cliente
           </button>
           <button 
+            type="button"
             onClick={() => setActiveTab('PROPERTIES')}
             className={`pb-2 px-4 text-sm font-semibold flex items-center gap-2 transition-colors whitespace-nowrap ${activeTab === 'PROPERTIES' ? 'border-b-2 border-gold-500 text-navy-900' : 'text-slate-500'}`}
           >
             <Home className="h-4 w-4" /> Imóveis
           </button>
           <button 
+            type="button"
             onClick={() => setActiveTab('INTERESTS')}
             className={`pb-2 px-4 text-sm font-semibold flex items-center gap-2 transition-colors whitespace-nowrap ${activeTab === 'INTERESTS' ? 'border-b-2 border-gold-500 text-navy-900' : 'text-slate-500'}`}
           >
@@ -158,6 +218,7 @@ const Backoffice: React.FC = () => {
           </button>
           {currentUser?.role === 'ADMIN' && (
             <button 
+              type="button"
               onClick={() => setActiveTab('TEAM')}
               className={`pb-2 px-4 text-sm font-semibold flex items-center gap-2 transition-colors whitespace-nowrap ${activeTab === 'TEAM' ? 'border-b-2 border-gold-500 text-navy-900' : 'text-slate-500'}`}
             >
@@ -167,7 +228,7 @@ const Backoffice: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-          {/* TAB: MATCHES */}
+          {/* TAB: MATCHES (Cliente) */}
           {activeTab === 'MATCHES' && (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-600">
@@ -199,11 +260,12 @@ const Backoffice: React.FC = () => {
                         <td className="p-4">
                            {match.status === 'PENDING' && (
                               <button 
+                                type="button"
                                 onClick={() => handleUpdateStatus(match.id, 'CONTACTED')}
                                 className="flex items-center gap-1 text-green-600 hover:text-green-800 transition-colors"
                                 title="Marcar como Atendido"
                               >
-                                <CheckCircle className="h-5 w-5" />
+                                <CheckCircle className="h-5 w-5 pointer-events-none" />
                               </button>
                            )}
                            {match.status === 'CONTACTED' && (
@@ -226,8 +288,10 @@ const Backoffice: React.FC = () => {
               <table className="w-full text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
                   <tr>
+                    <th className="p-4">Status</th>
                     <th className="p-4">Tipo</th>
                     <th className="p-4">Localização</th>
+                    <th className="p-4">Valor</th>
                     <th className="p-4">Proprietário</th>
                     <th className="p-4">Telefone</th>
                     <th className="p-4">Ações</th>
@@ -235,35 +299,70 @@ const Backoffice: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {data.properties.length === 0 ? (
-                    <tr><td colSpan={5} className="p-8 text-center text-slate-400">Nenhum imóvel cadastrado.</td></tr>
+                    <tr><td colSpan={7} className="p-8 text-center text-slate-400">Nenhum imóvel cadastrado.</td></tr>
                   ) : (
                     data.properties.map(prop => (
-                      <tr key={prop.id} className="hover:bg-slate-50">
+                      <tr key={prop.id} className={`hover:bg-slate-50 ${prop.status === 'PENDING' ? 'bg-amber-50/50' : ''}`}>
+                        <td className="p-4">
+                          {getPropStatusBadge(prop.status)}
+                        </td>
                         <td className="p-4">{prop.type}</td>
                         <td className="p-4">{prop.region} - {prop.condoName}</td>
+                        <td className="p-4 font-semibold text-navy-900">
+                          {prop.price ? prop.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
+                        </td>
                         <td className="p-4 text-navy-900 font-medium">{prop.ownerName}</td>
                         <td className="p-4">{prop.ownerPhone}</td>
                         <td className="p-4 flex items-center gap-3">
+                          
+                          {/* 
+                             BOTÃO DE APROVAÇÃO (JOINHA)
+                             Ação direta sem confirmação para evitar bloqueios.
+                           */}
+                          {prop.status === 'PENDING' && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleApproveProperty(e, prop.id)}
+                              className="text-green-600 hover:text-green-800 bg-green-100 hover:bg-green-200 p-2 rounded-full transition-all shadow-sm cursor-pointer border border-green-200"
+                              title="Validar Cadastro (Publicar)"
+                            >
+                              <ThumbsUp className="h-5 w-5 pointer-events-none" />
+                            </button>
+                          )}
+
+                          {/* 
+                             BOTÃO DE DESTAQUE (ESTRELA)
+                             Só habilitado se status == APPROVED.
+                           */}
                           <button
-                            onClick={() => handleToggleFeatured(prop.id)}
-                            className="transition-colors focus:outline-none"
-                            title={prop.isFeatured ? "Remover Destaque" : "Adicionar aos Destaques"}
+                            type="button"
+                            onClick={(e) => handleToggleFeatured(e, prop)}
+                            className={`transition-colors focus:outline-none p-1 rounded-full
+                              ${prop.status === 'APPROVED' 
+                                ? 'cursor-pointer hover:bg-slate-100' 
+                                : 'opacity-30 cursor-not-allowed grayscale'
+                              }`}
+                            title={prop.status !== 'APPROVED' ? "Valide o cadastro primeiro" : (prop.isFeatured ? "Remover Destaque" : "Adicionar aos Destaques")}
                           >
-                            <Star className={`h-5 w-5 ${prop.isFeatured ? 'fill-gold-500 text-gold-500' : 'text-slate-300 hover:text-gold-500'}`} />
+                            <Star className={`h-5 w-5 pointer-events-none ${prop.isFeatured ? 'fill-gold-500 text-gold-500' : 'text-slate-300 hover:text-gold-500'}`} />
                           </button>
+                          
                           <button
-                            onClick={() => navigate('/comprar', { state: { propertyId: prop.id } })}
-                            className="text-blue-400 hover:text-blue-600 transition-colors"
-                            title="Visualizar Imóvel na Loja"
+                            type="button"
+                            onClick={() => navigate('/comprar', { state: { propertyId: prop.id, isPreview: true } })}
+                            className="text-blue-400 hover:text-blue-600 transition-colors p-1"
+                            title="Visualizar Imóvel (Preview)"
                           >
-                            <Eye className="h-5 w-5" />
+                            <Eye className="h-5 w-5 pointer-events-none" />
                           </button>
+                          
                           <button 
+                            type="button"
                             onClick={() => handleRemoveProperty(prop.id)}
-                            className="text-red-400 hover:text-red-600 transition-colors"
+                            className="text-red-400 hover:text-red-600 transition-colors p-1"
                             title="Excluir Imóvel"
                           >
-                            <Trash2 className="h-5 w-5" />
+                            <Trash2 className="h-5 w-5 pointer-events-none" />
                           </button>
                         </td>
                       </tr>
@@ -282,6 +381,7 @@ const Backoffice: React.FC = () => {
                  <tr>
                    <th className="p-4">Nome</th>
                    <th className="p-4">Busca</th>
+                   <th className="p-4">Orçamento Máximo</th>
                    <th className="p-4">Contato</th>
                  </tr>
                </thead>
@@ -297,6 +397,9 @@ const Backoffice: React.FC = () => {
                             "{int.characteristics}"
                           </div>
                         )}
+                     </td>
+                     <td className="p-4 font-semibold text-slate-700">
+                        {int.maxPrice ? int.maxPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                      </td>
                      <td className="p-4">{int.buyerPhone}</td>
                    </tr>
@@ -381,11 +484,12 @@ const Backoffice: React.FC = () => {
                          <td className="p-4">
                            {user.role !== 'ADMIN' && (
                              <button 
+                               type="button"
                                onClick={() => handleRemoveUser(user.id)}
                                className="text-red-400 hover:text-red-600 transition-colors"
                                title="Remover usuário"
                              >
-                               <Trash2 className="h-5 w-5" />
+                               <Trash2 className="h-5 w-5 pointer-events-none" />
                              </button>
                            )}
                          </td>

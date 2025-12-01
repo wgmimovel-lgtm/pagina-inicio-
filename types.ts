@@ -7,6 +7,8 @@ export enum PropertyType {
   COMMERCIAL = 'Comercial',
 }
 
+export type PropertyStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
 export interface Property {
   id: string;
   type: PropertyType;
@@ -15,11 +17,13 @@ export interface Property {
   bedrooms: number;
   area: number; // m²
   price?: number;
+  videoUrl?: string; // New field for YouTube link
   description: string;
   ownerName: string;
   ownerPhone: string;
   images: string[]; // URLs
   isFeatured?: boolean; // New field for highlights
+  status: PropertyStatus; // Workflow status
   createdAt: number;
 }
 
@@ -29,6 +33,7 @@ export interface BuyerInterest {
   region: string;
   minBedrooms: number;
   minArea: number;
+  maxPrice?: number; // New field for budget
   characteristics?: string; // Optional field for specific needs
   buyerName: string;
   buyerPhone: string;

@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PropertyType, Property } from '../types';
 import { getProperties, addInterest, addMatch } from '../services/storageService';
-import { Search, BedDouble, Ruler, MapPin, Heart, X, Phone, User as UserIcon, CheckCircle, Minus, Plus } from 'lucide-react';
+import { Search, BedDouble, Ruler, MapPin, Heart, X, Phone, User as UserIcon, CheckCircle, Minus, Plus, DollarSign, Youtube, AlertTriangle } from 'lucide-react';
 
 // Helper to format phone number as (XX) XXXXX-XXXX
 const formatPhoneNumber = (value: string) => {
@@ -16,9 +15,21 @@ const formatPhoneNumber = (value: string) => {
   return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
 };
 
+// Helper to format currency BRL
+const formatCurrency = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  const numberValue = Number(digits) / 100;
+  return numberValue.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+};
+
 const BuyerPage: React.FC = () => {
   const location = useLocation();
   const targetPropertyId = location.state?.propertyId;
+  const isPreviewMode = !!location.state?.isPreview;
   const [isBrowsingAll, setIsBrowsingAll] = useState(!!location.state?.showAll);
   const [step, setStep] = useState<'FORM' | 'LIST'>(
     location.state?.showAll || targetPropertyId ? 'LIST' : 'FORM'
@@ -33,6 +44,7 @@ const BuyerPage: React.FC = () => {
     region: '',
     minBedrooms: 2,
     minArea: 0,
+    maxPrice: '', // String for input masking
     characteristics: '',
     buyerName: '',
     buyerPhone: '',
@@ -49,13 +61,25 @@ const BuyerPage: React.FC = () => {
       const allProperties = getProperties();
       
       if (targetPropertyId) {
-        // If navigating with a specific property ID (e.g., from Backoffice), show only that property
-        const specific = allProperties.filter(p => p.id === targetPropertyId);
-        setProperties(specific);
+        // If navigating with a specific property ID (e.g., from Backoffice Preview)
+        const specific = allProperties.find(p => String(p.id) === String(targetPropertyId));
+        
+        if (specific) {
+           // Allow viewing if it's Approved OR if it's Preview Mode
+           if (specific.status === 'APPROVED' || isPreviewMode) {
+              setProperties([specific]);
+           } else {
+              setProperties([]); // Don't show if pending and not in preview mode
+           }
+        }
       } else if (isBrowsingAll) {
-        setProperties(allProperties);
+        // Normal browsing - only show approved
+        const approvedProperties = allProperties.filter(p => p.status === 'APPROVED');
+        setProperties(approvedProperties);
       } else {
-        const filtered = allProperties.filter(p => {
+        // Filtering - only show approved
+        const approvedProperties = allProperties.filter(p => p.status === 'APPROVED');
+        const filtered = approvedProperties.filter(p => {
           const typeMatch = p.type === buyerInfo.type;
           const bedMatch = p.bedrooms >= buyerInfo.minBedrooms;
           return typeMatch && bedMatch;
@@ -63,13 +87,19 @@ const BuyerPage: React.FC = () => {
         setProperties(filtered);
       }
     }
-  }, [step, buyerInfo, isBrowsingAll, targetPropertyId]);
+  }, [step, buyerInfo, isBrowsingAll, targetPropertyId, isPreviewMode]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
 
     if (name === 'buyerPhone') {
       const formatted = formatPhoneNumber(value);
+      setBuyerInfo(prev => ({ ...prev, [name]: formatted }));
+      return;
+    }
+
+    if (name === 'maxPrice') {
+      const formatted = formatCurrency(value);
       setBuyerInfo(prev => ({ ...prev, [name]: formatted }));
       return;
     }
@@ -106,15 +136,25 @@ const BuyerPage: React.FC = () => {
   const handleSubmitInterest = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Parse BRL string back to number
+    const cleanPriceString = buyerInfo.maxPrice.replace(/[^\d,]/g, '').replace(',', '.');
+    const finalMaxPrice = cleanPriceString ? parseFloat(cleanPriceString) : 0;
+
     setTimeout(() => {
       addInterest({
         id: Date.now().toString(),
         ...buyerInfo,
         minBedrooms: Number(buyerInfo.minBedrooms),
         minArea: Number(buyerInfo.minArea),
+        maxPrice: finalMaxPrice,
         createdAt: Date.now(),
       });
       
+      // Trigger GREEN notification for new LEAD
+      localStorage.setItem('NOTIFY_LEAD', 'true');
+      window.dispatchEvent(new Event('notify-lead'));
+
       // Pre-fill the contact form for the list view if they used the filter
       setContactForm({
           name: buyerInfo.buyerName,
@@ -151,9 +191,9 @@ const BuyerPage: React.FC = () => {
       createdAt: Date.now(),
     });
 
-    // Trigger a storage event to update notification badges
-    window.dispatchEvent(new Event('new-lead-generated'));
-    localStorage.setItem('HAS_NEW_LEADS', 'true');
+    // Trigger GREEN notification for new LEAD (Match)
+    localStorage.setItem('NOTIFY_LEAD', 'true');
+    window.dispatchEvent(new Event('notify-lead'));
 
     setMatchSuccess(selectedProperty.id);
     closeInterestModal();
@@ -226,10 +266,23 @@ const BuyerPage: React.FC = () => {
                   </button>
                </div>
              </div>
+
+             {/* Max Investment (New Field) */}
+             <div className="col-span-1 md:col-span-2">
+               <label className="block text-sm font-medium text-slate-700 mb-1">Valor Máximo do Investimento <span className="text-slate-400 font-normal">(Opcional)</span></label>
+               <input 
+                  type="text" 
+                  name="maxPrice" 
+                  placeholder="R$ 0,00" 
+                  value={buyerInfo.maxPrice} 
+                  onChange={handleInputChange} 
+                  className="w-full p-2 border border-slate-300 rounded-sm bg-white focus:ring-2 focus:ring-navy-900 focus:border-transparent" 
+                />
+             </div>
              
              {/* Characteristics Field */}
              <div className="col-span-1 md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Características do Imóvel <span className="text-slate-400 font-normal">(Opcional)</span></label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Características do Imóvel que busca <span className="text-slate-400 font-normal">(Opcional)</span></label>
                 <textarea 
                   name="characteristics" 
                   maxLength={280}
@@ -247,8 +300,8 @@ const BuyerPage: React.FC = () => {
              <div className="col-span-1 md:col-span-2 pt-4 border-t border-slate-100">
                 <h3 className="text-md font-semibold text-navy-800 mb-4">Seus Contatos</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <input type="text" name="buyerName" placeholder="Seu Nome" value={buyerInfo.buyerName} onChange={handleInputChange} required className="w-full p-2 border border-slate-300 rounded-sm bg-white focus:ring-2 focus:ring-navy-900 focus:border-transparent" />
-                  <input type="tel" name="buyerPhone" maxLength={15} placeholder="(21) 99999-9999" value={buyerInfo.buyerPhone} onChange={handleInputChange} required className="w-full p-2 border border-slate-300 rounded-sm bg-white focus:ring-2 focus:ring-navy-900 focus:border-transparent" />
+                  <input type="text" name="buyerName" placeholder="Seu Nome" value={buyerInfo.buyerName} onChange={handleInputChange} required className="w-full p-2 border border-slate-300 rounded-sm bg-white focus:ring-2 focus:ring-navy-900 focus:border-transparent bg-white" />
+                  <input type="tel" name="buyerPhone" maxLength={15} placeholder="(21) 99999-9999" value={buyerInfo.buyerPhone} onChange={handleInputChange} required className="w-full p-2 border border-slate-300 rounded-sm bg-white focus:ring-2 focus:ring-navy-900 focus:border-transparent bg-white" />
                 </div>
              </div>
            </div>
@@ -265,6 +318,17 @@ const BuyerPage: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12 relative">
+      {/* PREVIEW MODE BANNER */}
+      {isPreviewMode && (
+         <div className="mb-6 bg-amber-100 border-l-4 border-amber-500 p-4 rounded-r shadow-md flex items-center gap-3">
+            <AlertTriangle className="h-6 w-6 text-amber-600" />
+            <div>
+               <h3 className="text-sm font-bold text-amber-800">MODO DE PRÉ-VISUALIZAÇÃO (GESTOR)</h3>
+               <p className="text-xs text-amber-700">Você está visualizando este imóvel antes da publicação. Clientes não têm acesso a esta página ainda.</p>
+            </div>
+         </div>
+      )}
+
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-3xl font-serif font-bold text-navy-900">
           {isBrowsingAll || targetPropertyId ? 'Todos os Imóveis' : 'Imóveis Disponíveis'}
@@ -282,11 +346,44 @@ const BuyerPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {properties.map(prop => (
             <div key={prop.id} className="bg-white rounded-lg shadow-md overflow-hidden border border-slate-100 hover:shadow-xl transition-shadow flex flex-col">
-              <div className="h-56 w-full bg-slate-200 relative">
-                <img src={prop.images[0]} alt="Imóvel" className="w-full h-full object-cover" />
+              <div className="h-56 w-full bg-slate-200 relative group">
+                <img src={prop.images[0]} alt="Imóvel" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                
+                {/* Status / Type Badge */}
                 <div className="absolute top-4 right-4 bg-white/90 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide text-navy-900 shadow-sm">
                   {prop.type}
                 </div>
+                
+                {/* Preview Badge if pending */}
+                {prop.status === 'PENDING' && (
+                  <div className="absolute top-4 left-4 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide shadow-sm">
+                     PENDENTE
+                  </div>
+                )}
+
+                {/* Video Icon Link */}
+                {prop.videoUrl && (
+                  <a 
+                    href={prop.videoUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="absolute top-4 left-4 bg-red-600/90 text-white p-2 rounded-full hover:bg-red-600 hover:scale-110 transition-all shadow-md flex items-center justify-center z-20"
+                    title="Ver vídeo do imóvel"
+                    onClick={(e) => e.stopPropagation()}
+                    style={prop.status === 'PENDING' ? {top: '3rem'} : {}}
+                  >
+                    <Youtube className="h-5 w-5 fill-current" />
+                  </a>
+                )}
+
+                {/* Price Display on Card */}
+                {prop.price && prop.price > 0 && (
+                   <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/70 to-transparent p-4 pt-10">
+                      <p className="text-white font-bold text-lg">
+                        {prop.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </p>
+                   </div>
+                )}
               </div>
               <div className="p-6 flex-grow flex flex-col">
                  <div className="mb-4">
@@ -349,6 +446,11 @@ const BuyerPage: React.FC = () => {
               <div className="mb-6 p-3 bg-slate-50 rounded border border-slate-100 text-sm text-slate-600">
                 <span className="font-bold block text-navy-900 mb-1">{selectedProperty.condoName || 'Imóvel Exclusivo'}</span>
                 <span className="block">{selectedProperty.region} • {selectedProperty.bedrooms} Quartos • {selectedProperty.area}m²</span>
+                {selectedProperty.price && selectedProperty.price > 0 && (
+                  <span className="block font-bold text-gold-600 mt-1">
+                    {selectedProperty.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                )}
               </div>
 
               <form onSubmit={confirmInterest} className="space-y-4">

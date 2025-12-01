@@ -4,7 +4,9 @@ import { Building2, Menu, X, ShieldCheck, Bell } from 'lucide-react';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const [hasNewLeads, setHasNewLeads] = React.useState(false);
+  const [hasNewProperty, setHasNewProperty] = React.useState(false);
+  const [hasNewLead, setHasNewLead] = React.useState(false);
+  
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -26,38 +28,40 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // Force Home on Mount
   useEffect(() => {
-    // This ensures that whenever the app is fully reloaded (or opened for the first time),
-    // it always starts at the Home page, ignoring deep links or previous hash states.
     navigate('/');
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
 
   useEffect(() => {
     // Check initial state
-    const checkLeads = () => {
-      const hasLeads = localStorage.getItem('HAS_NEW_LEADS') === 'true';
-      setHasNewLeads(hasLeads);
+    const checkNotifications = () => {
+      setHasNewProperty(localStorage.getItem('NOTIFY_PROPERTY') === 'true');
+      setHasNewLead(localStorage.getItem('NOTIFY_LEAD') === 'true');
     };
     
-    checkLeads();
+    checkNotifications();
 
-    // Listen for custom event from BuyerPage
-    const handleNewLead = () => setHasNewLeads(true);
-    window.addEventListener('new-lead-generated', handleNewLead);
+    // Listen for custom events
+    const handlePropertyNotify = () => setHasNewProperty(true);
+    const handleLeadNotify = () => setHasNewLead(true);
 
-    // Listen to storage changes (if multiple tabs)
-    window.addEventListener('storage', checkLeads);
+    window.addEventListener('notify-property', handlePropertyNotify);
+    window.addEventListener('notify-lead', handleLeadNotify);
+    window.addEventListener('storage', checkNotifications);
 
     return () => {
-      window.removeEventListener('new-lead-generated', handleNewLead);
-      window.removeEventListener('storage', checkLeads);
+      window.removeEventListener('notify-property', handlePropertyNotify);
+      window.removeEventListener('notify-lead', handleLeadNotify);
+      window.removeEventListener('storage', checkNotifications);
     };
   }, []);
 
-  // Clear notification when visiting Gestao
+  // Clear notifications when visiting Gestao
   useEffect(() => {
     if (location.pathname === '/gestao') {
-      localStorage.removeItem('HAS_NEW_LEADS');
-      setHasNewLeads(false);
+      localStorage.removeItem('NOTIFY_PROPERTY');
+      localStorage.removeItem('NOTIFY_LEAD');
+      setHasNewProperty(false);
+      setHasNewLead(false);
     }
   }, [location.pathname]);
 
@@ -73,13 +77,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           backgroundRepeat: 'no-repeat',
         }}
       >
-        {/* Overlay to ensure readability (90% opacity slate-50) */}
         <div className="absolute inset-0 bg-slate-50/90 backdrop-blur-[1px]"></div>
       </div>
 
-      {/* Content Wrapper (sits on top of background) */}
+      {/* Content Wrapper */}
       <div className="relative z-10 flex flex-col min-h-screen">
-        {/* Header */}
         <header className="bg-navy-900 text-white sticky top-0 z-50 shadow-lg border-b border-slate-800">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-24">
@@ -101,21 +103,33 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 
                 <Link to="/gestao" className={`relative ${getNavLinkClass('/gestao')}`}>
                   Gestão
-                  {hasNewLeads && (
-                    <span className="absolute -top-2 -right-2 flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                    </span>
-                  )}
+                  {/* Notification Container */}
+                  <div className="absolute -top-2 -right-3 flex space-x-1">
+                    {hasNewProperty && (
+                      <span className="relative flex h-3 w-3" title="Novo Imóvel">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      </span>
+                    )}
+                    {hasNewLead && (
+                      <span className="relative flex h-3 w-3" title="Novo Cliente">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                      </span>
+                    )}
+                  </div>
                 </Link>
               </nav>
 
               {/* Mobile Menu Button */}
               <div className="md:hidden flex items-center gap-4">
-                {hasNewLeads && (
+                {(hasNewProperty || hasNewLead) && (
                     <Link to="/gestao" className="relative">
                       <Bell className="h-5 w-5 text-gold-500" />
-                      <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+                      <div className="absolute -top-1 -right-2 flex space-x-0.5">
+                        {hasNewProperty && <span className="h-2 w-2 bg-red-500 rounded-full"></span>}
+                        {hasNewLead && <span className="h-2 w-2 bg-green-500 rounded-full"></span>}
+                      </div>
                     </Link>
                 )}
                 <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-300 hover:text-white">
@@ -134,19 +148,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <Link to="/comprar" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 text-base font-medium text-slate-300 hover:text-white hover:bg-navy-900">Comprar</Link>
                 <Link to="/gestao" onClick={() => setIsMenuOpen(false)} className="flex items-center justify-between px-3 py-2 text-base font-medium text-slate-300 hover:text-white hover:bg-navy-900">
                   <span>Gestão</span>
-                  {hasNewLeads && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">NOVO LEAD</span>}
+                  <div className="flex gap-2">
+                    {hasNewProperty && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">IMÓVEL</span>}
+                    {hasNewLead && <span className="bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full">CLIENTE</span>}
+                  </div>
                 </Link>
               </div>
             </div>
           )}
         </header>
 
-        {/* Content */}
         <main className="flex-grow">
           {children}
         </main>
 
-        {/* Footer */}
         <footer className="bg-navy-900 text-slate-400 py-8 border-t border-slate-800">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">

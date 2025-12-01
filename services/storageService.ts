@@ -1,5 +1,5 @@
 
-import { Property, BuyerInterest, LeadMatch, StorageData, User } from '../types';
+import { Property, BuyerInterest, LeadMatch, StorageData, User, PropertyStatus } from '../types';
 
 const STORAGE_KEY = 'BARRA_BUSINESS_DB';
 
@@ -51,23 +51,42 @@ const saveDB = (data: StorageData) => {
 // --- Properties ---
 export const addProperty = (property: Property) => {
   const db = getDB();
-  db.properties.push(property);
+  // Ensure status is set to PENDING for new registrations
+  const newProperty = { ...property, status: 'PENDING' as PropertyStatus };
+  db.properties.push(newProperty);
   saveDB(db);
 };
 
 export const getProperties = (): Property[] => {
-  return getDB().properties;
+  const db = getDB();
+  // Map legacy properties (missing status) to APPROVED so they don't disappear
+  return db.properties.map(p => ({
+    ...p,
+    status: p.status || 'APPROVED'
+  }));
+};
+
+export const updatePropertyStatus = (id: string, status: PropertyStatus) => {
+  const db = getDB();
+  // Ensure we compare IDs as strings to avoid type mismatches
+  const index = db.properties.findIndex(p => String(p.id) === String(id));
+  if (index !== -1) {
+    db.properties[index].status = status;
+    saveDB(db);
+  } else {
+    console.error(`Property with ID ${id} not found.`);
+  }
 };
 
 export const removeProperty = (id: string) => {
   const db = getDB();
-  db.properties = db.properties.filter(p => p.id !== id);
+  db.properties = db.properties.filter(p => String(p.id) !== String(id));
   saveDB(db);
 };
 
 export const togglePropertyFeatured = (id: string) => {
   const db = getDB();
-  const index = db.properties.findIndex(p => p.id === id);
+  const index = db.properties.findIndex(p => String(p.id) === String(id));
   if (index !== -1) {
     // Toggle boolean, defaulting to false if undefined
     const current = !!db.properties[index].isFeatured;

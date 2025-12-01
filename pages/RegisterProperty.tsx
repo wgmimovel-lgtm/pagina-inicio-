@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { PropertyType } from '../types';
 import { addProperty } from '../services/storageService';
 import { generatePropertyDescription } from '../services/geminiService';
-import { Sparkles, Upload, CheckCircle, Minus, Plus } from 'lucide-react';
+import { Sparkles, Upload, CheckCircle, Minus, Plus, Clock, Youtube } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // Helper to format phone number as (XX) XXXXX-XXXX
@@ -16,6 +16,22 @@ const formatPhoneNumber = (value: string) => {
   return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
 };
 
+// Helper to format currency BRL
+const formatCurrency = (value: string) => {
+  // Remove non-digits
+  const digits = value.replace(/\D/g, '');
+  
+  if (!digits) return '';
+  
+  // Convert to float (cents)
+  const numberValue = Number(digits) / 100;
+  
+  return numberValue.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+};
+
 const RegisterProperty: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -27,6 +43,7 @@ const RegisterProperty: React.FC = () => {
     region: '',
     // condoName removed from UI, but we keep it in state if needed or just hardcode empty on submit
     price: '',
+    videoUrl: '',
     bedrooms: 1,
     area: 0,
     description: '',
@@ -44,8 +61,9 @@ const RegisterProperty: React.FC = () => {
     }
     
     if (name === 'price') {
-       // Simple handling, could add mask here
-       setFormData(prev => ({ ...prev, [name]: value }));
+       // Apply BRL Currency Mask
+       const formatted = formatCurrency(value);
+       setFormData(prev => ({ ...prev, [name]: formatted }));
        return;
     }
 
@@ -92,17 +110,10 @@ const RegisterProperty: React.FC = () => {
     e.preventDefault();
     setLoading(true);
 
-    // Basic price parsing
-    // Handles "1.000,00", "1000.00", "1000"
-    const cleanPriceString = formData.price.replace(/[^0-9,.]/g, ''); // remove currency symbols
-    // Naive parsing assuming PT-BR if comma exists, or simple float
-    let finalPrice = 0;
-    if (cleanPriceString) {
-        // Replace dots (thousand separators) with nothing, replace comma with dot
-        const normalized = cleanPriceString.replace(/\./g, '').replace(',', '.');
-        finalPrice = parseFloat(normalized);
-        if (isNaN(finalPrice)) finalPrice = 0;
-    }
+    // Parse BRL string back to number
+    // "R$ 850.000,00" -> 850000.00
+    const cleanPriceString = formData.price.replace(/[^\d,]/g, '').replace(',', '.');
+    const finalPrice = cleanPriceString ? parseFloat(cleanPriceString) : 0;
 
     // Simulate API call and image upload
     setTimeout(() => {
@@ -113,15 +124,21 @@ const RegisterProperty: React.FC = () => {
         price: finalPrice,
         bedrooms: Number(formData.bedrooms),
         area: Number(formData.area),
+        status: 'PENDING', // Typed in storageService, but explicit here for clarity
         images: [
             `https://picsum.photos/800/600?random=${Math.random()}`,
             `https://picsum.photos/800/600?random=${Math.random() + 1}`,
         ],
         createdAt: Date.now(),
       });
+
+      // Trigger RED notification for New Property
+      localStorage.setItem('NOTIFY_PROPERTY', 'true');
+      window.dispatchEvent(new Event('notify-property'));
+
       setLoading(false);
       setSuccess(true);
-      setTimeout(() => navigate('/'), 3000);
+      setTimeout(() => navigate('/'), 6000); // Give them time to read the message
     }, 1000);
   };
 
@@ -129,12 +146,22 @@ const RegisterProperty: React.FC = () => {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-6 bg-slate-50">
         <div className="bg-white p-8 rounded-lg shadow-xl text-center max-w-md">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-serif font-bold text-navy-900 mb-2">Imóvel Cadastrado!</h2>
-          <p className="text-slate-600 mb-6">
-            Seus dados foram recebidos com sucesso. Nossos gestores entrarão em contato em breve para validar as informações.
+          <div className="flex justify-center mb-4">
+             <div className="relative">
+                <CheckCircle className="h-16 w-16 text-green-500" />
+                <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1">
+                   <Clock className="h-6 w-6 text-gold-500" />
+                </div>
+             </div>
+          </div>
+          <h2 className="text-2xl font-serif font-bold text-navy-900 mb-2">Cadastro Realizado!</h2>
+          <p className="text-slate-600 mb-4 font-medium">
+            Seu imóvel foi enviado para nossa base e está <span className="text-gold-600 font-bold">pendente de avaliação</span>.
           </p>
-          <p className="text-sm text-slate-400">Redirecionando...</p>
+          <p className="text-sm text-slate-500 mb-6 bg-slate-50 p-4 rounded border border-slate-100">
+            Nossa equipe de gestores analisará as informações em breve para autorizar a publicação e garantir a qualidade do portfólio.
+          </p>
+          <p className="text-xs text-slate-400">Você será redirecionado para a página inicial...</p>
         </div>
       </div>
     );
@@ -192,6 +219,26 @@ const RegisterProperty: React.FC = () => {
               />
             </div>
 
+            {/* Video Link Field */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                Link do Vídeo (YouTube) <span className="text-slate-400 font-normal ml-1">(Opcional)</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Youtube className="h-4 w-4 text-slate-400" />
+                </div>
+                <input 
+                  type="url" 
+                  name="videoUrl" 
+                  value={formData.videoUrl} 
+                  onChange={handleInputChange} 
+                  placeholder="https://youtube.com/..." 
+                  className="w-full pl-9 p-2 border border-slate-300 rounded-sm focus:ring-2 focus:ring-navy-900 bg-white"
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Quartos</label>
@@ -223,9 +270,10 @@ const RegisterProperty: React.FC = () => {
                       type="number" 
                       name="area" 
                       min="0"
-                      value={formData.area}
+                      value={formData.area || ''}
                       onChange={handleInputChange}
                       required
+                      placeholder="0"
                       className="w-full p-2 text-center border-none focus:ring-0 bg-transparent appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                    />
                    <button type="button" onClick={() => handleIncrement('area')} className="p-2.5 hover:bg-slate-50 text-navy-900 border-l border-slate-200 transition-colors">
