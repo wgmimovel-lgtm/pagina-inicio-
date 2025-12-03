@@ -256,9 +256,10 @@ const BuyerPage: React.FC = () => {
                       type="number" 
                       name="minArea" 
                       min="0" 
-                      value={buyerInfo.minArea} 
+                      value={buyerInfo.minArea || ''} 
                       onChange={handleInputChange} 
                       required 
+                      placeholder="0"
                       className="w-full p-2 text-center border-none focus:ring-0 bg-transparent caret-gold-600 appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                   />
                   <button type="button" onClick={() => handleIncrement('minArea')} className="p-2.5 hover:bg-slate-50 text-navy-900 border-l border-slate-200 transition-colors">
